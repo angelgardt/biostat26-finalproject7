@@ -1,0 +1,30 @@
+project:
+  type: website
+  output-dir: docs
+  preview: 
+    port: 5050
+
+website:
+  title: "BI Proj 7"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+  sidebar: 
+    style: docked
+    contents: 
+      - eda_25-26.qmd
+
+format:
+  html:
+    html:
+    theme: 
+      light: flatly
+      dark: darkly
+    css: styles.css
+    toc: true
+    embed-resources: true
+    lightbox: true
+
+
+
