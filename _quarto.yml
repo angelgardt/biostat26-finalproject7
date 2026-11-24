@@ -12,8 +12,11 @@ website:
         text: Home
   sidebar: 
     style: docked
-    contents: 
-      - eda_25-26.qmd
+    contents:
+    - section: "Preproc & EDA"
+      contents: 
+        - spec.qmd
+        - eda_25-26.qmd
 
 format:
   html:

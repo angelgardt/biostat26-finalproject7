@@ -1,59 +1,233 @@
 ---
 title: "eda_25-26"
+execute: 
+  error: false
 ---
 
-:::{.callout-note title="Ключи"}
-
-| Переменная | Источник | Комментарий |
-|---|---|---|
-| `stud_id` | Все листы: ID учащегося | Формат `YYYY_YY-NNN`, можно вытащить год |
-| `pseudonym` | Все листы: Псевдоним ||
-| `year` | Префикс stud_id / Название папки ||
-| `stream` | 25/26: Поток 1/Поток 2 | Согласован с Отбор 1/2. В 21–24 соответствует Stepik1/Stepik2? |
-
-:::
+```{r}
+#| include: false
+library(tidyverse)
+```
 
 
-:::{.callout-note title="Общая информация"}
-
-Из файла `01_Общие_сведения.xlsx`
-
-| Переменная | 21/22 | 22/23 | 23/24 | 24/25 | 25/26 | Комментарий |
-|---|---|---|---|---|---|---|
-| `location` | Город | Заявка и отбор \| Город | Страна и город | Страна и город | Страна_и_город | свободный текст, нужна нормализация, но можно позже |
-| `role_status` | Статус | Заявка и отбор \| Статус | Статус | Должность/год обучения | Должность_иили_год_обучения | Видимо, записаны по-разному в разные годы --- где-то был выбор вариантов, где-то свободный текст |
-| `is_ib_alumni` | Выпускник ИБ | Заявка и отбор \| Являетесь ли вы студентом или выпускником годовой программы... | Являетесь ли вы студентом или выпускником годовой программы… | то же | Являетесь_ли_вы_выпускником… ||
-| `prior_ib_events` | Выпускник ИБ (1 чел. - интенсив) | Заявка и отбор \| Принимали ли вы участие... | Принимали ли вы участие… | то же | На_какой_программе… | Свободный текст |
-| `work_description` | Расскажите подробнее о вашей работе | Заявка и отбор \| Расскажите подробнее... | Расскажите подробнее… | то же | Расскажите_подробнее… ||
-| `data_analysis_exp` | — | Есть ли у вас опыт в анализе данных? | то же | то же | Опишите_ваш_опыт_в_анализе_данных… ||
-| `r_programming_exp` | — | …опыт работы в SAS или программирования в R… | …опыт программирования в R? | …на языке R? | Опишите_ваш_опыт_программирования_на_R ||
-| `expectations` | — | Что вы ожидаете от участия в программе? | то же | то же | Что_вы_ожидаете… ||
-| `future_application` | — | — | — | Как вы планируете… | Как_вы_планируете… ||
-| `info_source` | — | — | — | — | Откуда_вы_узнали… | Есть только в 25/26 в первом потоке |
-| `comments` | — | Комментарии | Комментарии | Комментарии | Любая_другая_информация… ||
-| `diploma_level` | — | Какой диплом… | — | — | — | Только 22/23 |
-| `is_expelled` | Аттестация (`Справка`/`NA` - отчисл.) | Отчисленные | то же | то же | то же | Надо смотреть пристально в отдельные года |
-
-:::
+## Preprocess
 
 
-:::{.callout-note title="Успеваемость --- итоговые оценки"}
+### Import Data
 
-| Переменная | 21/22 | 22/23 | 23/24 | 24/25 | 25/26 | Комментарий |
-|---|---|---|---|---|---|---|
-| `grade_tv_stats` | Теория вероятностей; Методы биостатистики (собрать индекс?) | ТВ+статистика (ДЗ №1–3, агрегировать как?) | ТВ + биостат | ТВ + биостат | ТВ + биостатстатистика ||
-| `grade_multivariate` | были в Методах биостатистики, как учитывать? | Дисперсионный анализ, Регрессионный анализ | Многофакторный анализ | Многофакторный анализ | Многофакторный анализ ||
-| `grade_evidence_medicine` | Внутри Методология и регуляторика ? | Док мед | Методология доказательной медицины | то же | то же ||
-| `grade_medical_data` | Клинико-лабораторная диагностика | Специфика мед данных | Специфика мед данных | Специфика мед данных | Специфика мед данных ||
-| `grade_data_viz` | Визуализация биомедицинских данных… | Визуализация | Визуализация данных | Датавиз | Датавиз ||
-| `grade_data_management` | — | — | Управление данными | Управление данными | ДМ + стат программирование ||
-| `grade_stat_programming` | Основы программирования на SAS (?) | — | — | Управление данными --- второй столбец ДЗ №1 (?) | «ДМ + стат программирование»: ДЗ СП | ✔ SAS (21/22) = «основы стат программирования» по роли в программе |
-| `grade_data_automation` | Автоматизация обработки данных… | — (Курс по R?) | Автоматизация обработки данных… | Автоматизация обработки данных | АвтоОД ||
-| `grade_r_stepik` | — | Курс по R | R ДЗ | R_Stepik | — | Как будто в каких-то годах совпадает с автоматизацией обработки данных, перепроверить |
-| `grade_regulatory` | Методология и регуляторика | Регуляторика тест на Stepik | Регуляторика | Регуляторика | Регуляторика | проверить значения и их сопоставимость |
-| `grade_sample_size` | — | — | Методы рассчёта выборки (зачёт) | Расчёт выборки | Колич планирование исследования | в 25/26 --- дифференцированная оценка, в 23–24 --- зачёт |
-| `grade_survival` | — | — | — | — | Анализ выживаемости ||
-| `grade_research_project` | Исследовательский проект (балл) | *Ждем добавления* | Научный проект | Проект | Проект ||
-| `mean_score` | Средний балл (*всегда можем посчитать сами, колонка имеет минимальный смысл.*)| — | — | — | — | будем ли вычислить для остальных? |
-| `final_attestation` | Аттестация | — | — | — | — ||
-:::
+```{r}
+path01 <- c("harmonized_data_short/2025_26/01_Общие_сведения.xlsx")
+path02 <- c("harmonized_data_short/2025_26/02_Успеваемость.xlsx")
+
+sheets01 <- readxl::excel_sheets(path01)
+sheets02 <- readxl::excel_sheets(path02)
+
+gen_info <- map(sheets01, \(x) readxl::read_excel(path01, sheet = x)) %>% 
+  set_names(sheets01) %>% map(\(x) rename_all(x, str_replace, pattern = "^_", replacement = ""))
+acad_perf <- map(sheets02, \(x) readxl::read_excel(path02, sheet = x)) %>% 
+  set_names(sheets02) %>% map(\(x) rename_all(x, str_replace, pattern = "^_", replacement = ""))
+```
+
+
+### General Info
+
+```{r}
+nrow(gen_info$`Поток 1`)
+
+gen_info$`Поток 1` %>% 
+  filter(!is.na(Страна_и_город)) %>% 
+  add_column(stream = 1) %>% 
+  bind_rows(
+    gen_info$`Поток 2` %>% 
+      filter(!is.na(Страна_и_город)) %>% 
+      add_column(stream = 2)
+  ) %>% 
+  add_column(year = "25/26") %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "location" = "Страна_и_город",
+    "role_status" = "Должность_иили_год_обучения",
+    "is_ib_alumni" = "Являетесь_ли_вы_выпускником_Института_биоинформатики",
+    "prior_ib_events" = "На_какой_программе_Института_биоинформатики_вы_учились",
+    "work_description" = "Расскажите_подробнее_о_вашей_работе_какими_исследованиями_занимаетесь_с_какими_проблемами_в_анализе_собственных_данных_сталкиваетесь",
+    "data_analysis_exp" =  "Опишите_ваш_опыт_в_анализе_данных_с_какими_данными_вы_работали_для_каких_целей",
+    "r_programming_exp" = "Опишите_ваш_опыт_программирования_на_R",
+    "expectations" = "Что_вы_ожидаете_от_участия_в_программе",
+    "future_application" = "Как_вы_планируете_применять_полученные_на_программе_знания_в_дальнейшем_",
+    "info_source" = "Откуда_вы_узнали_о_программе",
+    "comments" = "Любая_другая_информация_которой_вы_хотите_поделиться"
+  ) -> gen_info_merged
+
+nrow(gen_info_merged)
+all(gen_info$`Поток 1`$`ID учащегося` %in% gen_info_merged$stud_id)
+all(gen_info$`Поток 2`$`ID учащегося` %in% gen_info_merged$stud_id)
+
+gen_info$Отчисленные %>% 
+  rename("is_expelled" = "Строка в источнике",
+         "stud_id" = "ID учащегося",) %>% 
+  right_join(gen_info_merged) -> gen_info_merged
+```
+
+```{r}
+glimpse(gen_info_merged)
+```
+
+
+### Intro Exam
+
+```{r}
+all(colnames(acad_perf$`Stepik вступительный 1`) == colnames(acad_perf$`Stepik вступительный 2`))
+
+all(acad_perf$`Stepik вступительный 1`$`ID учащегося` %in% acad_perf$`Stepik вступительный 2`$`ID учащегося`)
+
+acad_perf$`Stepik вступительный 1` %>% 
+  add_column(stream_stepik = 1) %>% 
+  bind_rows(
+    acad_perf$`Stepik вступительный 2` %>% 
+      add_column(stream_stepik = 2)
+    ) %>% 
+  filter(!is.na(total)) %>% 
+  rename(
+    stud_id = "ID учащегося",
+    pseudonym = "Псевдоним",
+    math_q1 = "Математика Q1",
+    math_q2 = "Математика Q2",
+    math_q3 = "Математика Q3",
+    math_q4 = "Математика Q4",
+    stat_q1 = "Статистика Q1",
+    stat_q2 = "Статистика Q2",
+    stat_q3 = "Статистика Q3",
+    stat_q4 = "Статистика Q4",
+    rprog_q2 = "Программирование на R Q2",
+    rprog_q3 = "Программирование на R Q3",
+    rprog_q4 = "Программирование на R Q4",
+    total_test = "total"
+  ) -> stepik_intro
+all(stepik_intro$stud_id %in% gen_info_merged$stud_id)
+```
+
+```{r}
+glimpse(stepik_intro)
+```
+
+```{r}
+all(colnames(acad_perf$`Отбор 1`) %in% colnames(acad_perf$`Отбор 2`))
+
+acad_perf$`Отбор 1` %>% 
+    add_column(stream_creative = 1) %>% 
+  bind_rows(
+    acad_perf$`Отбор 2` %>% 
+        add_column(stream_creative = 1)
+    ) %>% 
+  rename(
+    stud_id = "ID учащегося",
+    pseudonym = "Псевдоним",
+    creative_task = "ТЗ"
+  ) %>% 
+  filter(!is.na(creative_task)) -> creative_task
+all(creative_task$stud_id %in% stepik_intro$stud_id)
+nrow(creative_task)
+
+stepik_intro %>% 
+  full_join(creative_task, by = join_by(stud_id, pseudonym)) -> intro_exam
+
+glimpse(intro_exam)
+
+intro_exam %>% 
+  summarise(n = n(),
+            .by = c(stud_id, pseudonym)) %>% 
+  filter(n > 1) -> intro_exam_doubles
+  
+intro_exam_doubles %>% 
+  knitr::kable()
+
+intro_exam %>% 
+  filter(stud_id %in% intro_exam_doubles$stud_id) %>% 
+  arrange(stud_id) -> intro_exam_doubles
+
+intro_exam %>%
+  anti_join(
+    intro_exam_doubles %>% 
+      filter(stream_stepik == 1)
+  ) %>% 
+  arrange(stud_id) -> intro_exam_clean
+
+intro_exam_clean %>% knitr::kable()
+```
+
+
+### Diploma Grades
+
+```{r}
+acad_perf$`Оценки для диплома` %>% colnames()
+acad_perf$`Оценки для диплома` %>% 
+  rename(
+    stud_id = `ID учащегося`,
+    pseudonym = Псевдоним,
+    grade_tv_stats = `1. ТВ и биостатистика`,
+    grade_multivariate = `2. Многофакторный анализ`,
+    grade_evidence_medicine = `3. Методология доказательной медицины`,
+    grade_data_viz = `4. Визуализация данных`,
+    grade_data_management = `5. Управление данными`,
+    grade_sample_size = `6. Методы расчёта выборки`,
+    grade_regulatory = `7. Основы регуляторики`,
+    grade_data_automation = `8. Автоматизация обработки данных`,
+    grade_bioequiv = `9. Анализ биоэквивалентности`,
+    grade_specialtopics = `10. Специальные разделы биостатистики`,
+    grade_biostatpract = `11. Практикум по индустриальной биостатистике`,
+    grade_research_project = `12. Научный проект`
+  ) %>% 
+  rename(
+    grade_tv_stats_a = `Без заголовка [D]`,
+    grade_multivariate_a = `Без заголовка [F]`,
+    grade_evidence_medicine_a = `Без заголовка [H]`,
+    grade_data_viz_a = `Без заголовка [J]`,
+    grade_data_management_a = `Без заголовка [L]`,
+    grade_sample_size_a = `Без заголовка [N]`,
+    grade_research_project_a = `Без заголовка [U]`
+  ) -> grades_diploma
+
+grades_diploma %>% glimpse()
+```
+
+
+### Courses
+
+```{r}
+acad_perf$`Теор. вер. + статистика`
+acad_perf$АвтоОД
+acad_perf$`Док. мед.`
+acad_perf$`Специфика мед данных`
+acad_perf$Датавиз
+acad_perf$`ДМ + стат программирование`
+acad_perf$`Многофакторный анализ`
+acad_perf$`Колич планирование исследования`
+acad_perf$`Анализ выживаемости`
+acad_perf$Регуляторика
+acad_perf$Проект
+```
+
+## EDA
+
+```{r}
+intro_exam_clean %>% 
+  select(is.numeric) %>% 
+  select(!starts_with("stream")) %>% 
+  cor() %>% 
+  ggcorrplot::ggcorrplot(
+    type = "lower",
+    lab = TRUE
+  )
+```
+
+```{r}
+intro_exam_clean %>% 
+  left_join(grades_diploma)
+
+```
+
+
+
+
+
