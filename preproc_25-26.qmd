@@ -455,7 +455,6 @@ all(full_data$stud_id %in% gen_info_merged$stud_id)
 ```
 
 ```{r}
-#| eval: false
 #| include: false
 
 full_data %>% write_csv("data/25-26/full_data_25-26.csv")
@@ -514,26 +513,26 @@ full_data %>% # colnames()
       tolower() %>% 
       str_detect("^зачёт") %>% 
       as.numeric(),
+    bioequiv_passed = grade_bioequiv %>% 
+      tolower() %>% 
+      str_detect("^зачёт") %>% 
+      as.numeric(),
+    specialtopics_passed = grade_specialtopics %>% 
+      tolower() %>% 
+      str_detect("^зачёт") %>% 
+      as.numeric(),
+    biostatpract_passed = grade_biostatpract %>% 
+      tolower() %>% 
+      str_detect("^зачёт") %>% 
+      as.numeric()
   ) %>% 
   mutate(across(starts_with("info_"), as.numeric)) %>% 
   mutate(across(contains("hw"), as.numeric)) %>% 
-  # select(
-  #   -Псевдоним,
-  #   -stream_creative,
-  #   -stream_stepik,
-  #   -work_description,
-  #   -data_analysis_exp,
-  #   -r_programming_exp,
-  #   -expectations,
-  #   -future_application,
-  #   -comments,
-  #   -info_source
-  # ) %>% 
   select(
     year,
     stream,
-    # location,
-    # role_status,
+    location,
+    role_status,
     stud_id,
     pseudonym,
     is_expelled,
@@ -544,48 +543,51 @@ full_data %>% # colnames()
     tv_hw2,
     stats_hw1,
     stats_hw2,
-    tv_stats_score = tv_stats_sum_roundup,
-    tv_stats_grade,
-    tv_stats_grade_a,
-    data_automation_passed,
+    d_tv_stats_score = tv_stats_sum_roundup,
+    d_tv_stats_grade = tv_stats_grade,
+    d_tv_stats_grade_a = tv_stats_grade_a,
+    d_data_automation_passed = data_automation_passed,
     evidence_medicine_hw1,
     evidence_medicine_hw2,
     evidence_medicine_hw3,
-    evidence_medicine_score = evidence_medicine_sum_roundup,
-    evidence_medicine_grade,
-    evidence_medicine_grade_a,
+    d_evidence_medicine_score = evidence_medicine_sum_roundup,
+    d_evidence_medicine_grade = evidence_medicine_grade,
+    d_evidence_medicine_grade_a = evidence_medicine_grade_a,
     medical_data_score = medical_data_grade,
     data_viz_hw1,
     data_viz_hw2,
     data_viz_hw3,
-    data_viz_score = data_viz_roundup,
-    data_viz_grade,
-    data_viz_grade_a,
+    d_data_viz_score = data_viz_roundup,
+    d_data_viz_grade = data_viz_grade,
+    d_data_viz_grade_a = data_viz_grade_a,
     data_management_hw_dm,
     data_management_hw_sp,
-    data_management_score = data_management_sum_roundup,
-    data_management_grade,
-    data_management_grade_a,
-    multivariate_hw,
-    multivariate_grade,
-    multivariate_grade_a,
-    sample_size_hw,
-    sample_size_grade,
-    sample_size_grade_a,
+    d_data_management_score = data_management_sum_roundup,
+    d_data_management_grade = data_management_grade,
+    d_data_management_grade_a = data_management_grade_a,
+    d_multivariate_hw = multivariate_hw,
+    d_multivariate_grade = multivariate_grade,
+    d_multivariate_grade_a = multivariate_grade_a,
+    d_sample_size_hw = sample_size_hw,
+    d_sample_size_grade = sample_size_grade,
+    d_sample_size_grade_a = sample_size_grade_a,
     survival_hw,
     survival_hw_passed,
-    regulatory_score,
-    regulatory_passed,
-    research_project_grade,
-    research_project_grade_a
+    d_regulatory_score = regulatory_score,
+    d_regulatory_passed = regulatory_passed,
+    d_bioequiv_passed = bioequiv_passed,
+    d_specialtopics_passed = specialtopics_passed,
+    d_biostatpract_passed = biostatpract_passed,
+    d_research_project_grade = research_project_grade,
+    d_research_project_grade_a = research_project_grade_a
   ) %>% 
+  mutate(medical_data_score = as.numeric(medical_data_score)) %>% 
   mutate(across(ends_with("grade"), tolower)) -> full_data_fix
+
 full_data_fix %>% glimpse()
 ```
 
 ```{r}
-#| eval: false
-
 full_data_fix %>% write_csv("data/25-26/full_data_fix.csv")
 ```
 

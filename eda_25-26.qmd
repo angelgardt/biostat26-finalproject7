@@ -1,27 +1,285 @@
 ---
 title: "EDA 25-26"
+code-fold: true
+code-summary: "Код"
 execute: 
   error: true
+  warning: false
 ---
 
 ```{r}
-intro_exam_clean %>% 
-  select(is.numeric) %>% 
-  select(!starts_with("stream")) %>% 
-  cor() %>% 
+#| include: false
+
+library(tidyverse)
+theme_set(theme_bw())
+theme_update(legend.position = "bottom")
+library(psych)
+```
+
+Грузим данные.
+
+```{r}
+ds <- read_csv("data/25-26/full_data_fix.csv")
+```
+
+
+## Вступительное испытание
+
+Вычисляем корреляции и тестируем значимость с поправкой Вenjamini-Hochberg.
+
+```{r}
+ds %>% 
+  select(
+    stud_id,
+    starts_with("intro_")
+  ) %>% 
+  rename_all(str_replace, pattern = "intro_", replacement = "") -> introexam
+
+introexam %>% 
+  select(-stud_id) %>% 
+  corr.test(adjust = "BH") -> introexam_cor_all
+
+introexam_cor_all_p_bh <- introexam_cor_all$p
+introexam_cor_all_p_bh[lower.tri(introexam_cor_all_p_bh)] <-
+  t(introexam_cor_all_p_bh)[lower.tri(introexam_cor_all_p_bh)]
+diag(introexam_cor_all_p_bh) <- 0
+```
+
+Строим матрицу.
+
+:::{.panel-tabset}
+
+### Все корреляции
+
+```{r}
+#| label: fig-introexam-cor-all
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между заданиями вступительного испытания. `total_test` --- суммарный балл за тестовую часть."
+
+introexam_cor_all$r %>% 
   ggcorrplot::ggcorrplot(
+    lab = TRUE,
     type = "lower",
-    lab = TRUE
+    show.legend = FALSE
   )
 ```
 
-```{r}
-intro_exam_clean %>% 
-  left_join(grades_diploma)
+### Только значимые корреляции
 
+```{r}
+#| label: fig-introexam-cor-all-sig
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между заданиями вступительного испытания. `total_test` --- суммарный балл за тестовую часть."
+
+introexam_cor_all$r %>% 
+  ggcorrplot::ggcorrplot(
+    p.mat = introexam_cor_all_p_bh,
+    lab = TRUE,
+    sig.level = 0.05,
+    insig = "blank",
+    type = "lower",
+    show.legend = FALSE
+  )
+```
+
+:::
+
+
+Посмотрим корреляции между категориями заданий --- математика, статистика, программирование на R.
+
+Вычисляем корреляции и тестируем значимость с поправкой Вenjamini-Hochberg.
+
+```{r}
+ds %>% 
+  select(
+    stud_id,
+    starts_with("intro_"),
+  ) %>% 
+  select(-intro_total_test, -intro_creative_task) %>% 
+  pivot_longer(cols = -stud_id) %>% 
+  separate(name, into = c("del", "category", "task"), sep = "_") %>% 
+  summarise(
+    score = sum(value),
+    .by = c(category, stud_id)
+  ) %>% 
+  pivot_wider(names_from = category, values_from = score) -> intro_exam_cat
+
+intro_exam_cat %>% 
+  left_join(
+    ds %>% 
+      select(stud_id, intro_creative_task)
+  ) %>% 
+  rename_all(str_replace, pattern = "intro_", replacement = "") %>% 
+  select(-stud_id) %>% 
+  corr.test(adjust = "BH") -> introexam_cor_cat
+
+introexam_cor_cat_p_bh <- introexam_cor_cat$p
+introexam_cor_cat_p_bh[lower.tri(introexam_cor_cat_p_bh)] <-
+  t(introexam_cor_cat_p_bh)[lower.tri(introexam_cor_cat_p_bh)]
+diag(introexam_cor_cat_p_bh) <- 0
+```
+
+Строим матрицу.
+
+:::{.panel-tabset}
+
+### Все корреляции
+
+```{r}
+#| label: fig-introexam-cor-cat
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между категориями заданий вступительного испытания"
+
+introexam_cor_cat$r %>% 
+  ggcorrplot::ggcorrplot(
+    type = "lower",
+    lab = TRUE,
+    show.legend = FALSE
+  )
+```
+
+### Только значимые корреляции
+
+```{r}
+#| label: fig-introexam-cor-cat-sig
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между категориями заданий вступительного испытания"
+
+introexam_cor_cat$r %>% 
+  ggcorrplot::ggcorrplot(
+    p.mat = introexam_cor_cat_p_bh,
+    lab = TRUE,
+    sig.level = 0.05,
+    insig = "blank",
+    type = "lower",
+    show.legend = FALSE
+  )
+```
+
+:::
+
+
+## Вступительные испытания и оценки аттестата
+
+```{r}
+intro_exam_cat %>% 
+  full_join(
+    ds %>% 
+      select(stud_id, starts_with("d_")) %>% 
+      select(!contains("grade"))
+  ) %>% 
+  rename_all(str_replace, pattern = "^d_", replacement = "") %>% 
+  select(-stud_id, -regulatory_score) %>% 
+  rename_all(str_replace, pattern = "_score$", replacement = "") %>% 
+  rename_all(str_replace, pattern = "_passed$", replacement = "") %>% 
+  rename_all(str_replace, pattern = "_hw$", replacement = "") %>% 
+  corr.test(adjust = "BH") -> intro_diploma_cor
+
+intro_diploma_cor_p_bh <- intro_diploma_cor$p
+intro_diploma_cor_p_bh[lower.tri(intro_diploma_cor_p_bh)] <-
+  t(intro_diploma_cor_p_bh)[lower.tri(intro_diploma_cor_p_bh)]
+diag(intro_diploma_cor_p_bh) <- 0
 ```
 
 
+:::{.panel-tabset}
 
+### Все корреляции
+
+```{r}
+#| label: fig-introexam-diploma-cor
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между категориями заданий вступительного испытания и оценок диплома"
+
+intro_diploma_cor$r %>% 
+  ggcorrplot::ggcorrplot(
+    type = "lower",
+    lab = TRUE,
+    show.legend = FALSE
+  )
+```
+
+### Только значимые корреляции
+
+```{r}
+#| label: fig-introexam-diploma-cor-sig
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между категориями заданий вступительного испытания и оценок диплома"
+
+intro_diploma_cor$r %>% 
+  ggcorrplot::ggcorrplot(
+    p.mat = intro_diploma_cor_p_bh,
+    lab = TRUE,
+    sig.level = 0.05,
+    insig = "blank",
+    type = "lower",
+    show.legend = FALSE
+  )
+```
+
+:::
+
+
+## Вступительные испытания и домашние работы
+
+```{r}
+intro_exam_cat %>% 
+  full_join(
+    ds %>% 
+      select(stud_id, contains("hw"), d_regulatory_score) %>% 
+      select(-survival_hw_passed)
+  ) %>% 
+  rename_all(str_replace, pattern = "^d_", replacement = "") %>% 
+  select(-stud_id, -regulatory_score) %>% 
+  rename_all(str_replace, pattern = "_score$", replacement = "") %>% 
+  # rename_all(str_replace, pattern = "_passed$", replacement = "") %>% 
+  rename_all(str_replace, pattern = "_hw$", replacement = "") %>% 
+  corr.test(adjust = "BH") -> intro_hw_cor
+
+intro_hw_cor_p_bh <- intro_hw_cor$p
+intro_hw_cor_p_bh[lower.tri(intro_hw_cor_p_bh)] <-
+  t(intro_hw_cor_p_bh)[lower.tri(intro_hw_cor_p_bh)]
+diag(intro_hw_cor_p_bh) <- 0
+```
+
+
+:::{.panel-tabset}
+
+### Все корреляции
+
+```{r}
+#| label: fig-introexam-hw-cor
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между категориями заданий вступительного испытания и оценок за доашние задания"
+
+intro_hw_cor$r %>% 
+  ggcorrplot::ggcorrplot(
+    type = "lower",
+    lab = TRUE,
+    lab_size = 2,
+    show.legend = FALSE
+  )
+```
+
+### Только значимые корреляции
+
+```{r}
+#| label: fig-introexam-hw-cor-sig
+#| fig-size: 8
+#| fig-cap: "25/26 Корреляции между категориями заданий вступительного испытания и оценок за домашние задания"
+
+intro_hw_cor$r %>% 
+  ggcorrplot::ggcorrplot(
+    p.mat = intro_hw_cor_p_bh,
+    lab = TRUE,
+    lab_size = 2,
+    sig.level = 0.05,
+    insig = "blank",
+    type = "lower",
+    show.legend = FALSE
+  )
+```
+
+:::
 
 
