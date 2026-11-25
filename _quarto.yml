@@ -16,6 +16,7 @@ website:
     - section: "Preproc & EDA"
       contents: 
         - spec.qmd
+        - preproc_25-26.qmd
         - eda_25-26.qmd
 
 format:

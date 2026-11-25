@@ -1,0 +1,591 @@
+---
+title: "Preprocessing 25-26"
+execute: 
+  error: false
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+```
+
+## Import Data
+
+```{r}
+path01 <- c("harmonized_data_short/2025_26/01_Общие_сведения.xlsx")
+path02 <- c("harmonized_data_short/2025_26/02_Успеваемость.xlsx")
+
+sheets01 <- readxl::excel_sheets(path01)
+sheets02 <- readxl::excel_sheets(path02)
+
+gen_info <- map(sheets01, \(x) readxl::read_excel(path01, sheet = x)) %>% 
+  set_names(sheets01) %>% map(\(x) rename_all(x, str_replace, pattern = "^_", replacement = ""))
+acad_perf <- map(sheets02, \(x) readxl::read_excel(path02, sheet = x)) %>% 
+  set_names(sheets02) %>% map(\(x) rename_all(x, str_replace, pattern = "^_", replacement = ""))
+```
+
+
+## General Info
+
+```{r}
+nrow(gen_info$`Поток 1`)
+
+gen_info$`Поток 1` %>% 
+  filter(!is.na(Страна_и_город)) %>% 
+  add_column(stream = 1) %>% 
+  bind_rows(
+    gen_info$`Поток 2` %>% 
+      filter(!is.na(Страна_и_город)) %>% 
+      add_column(stream = 2)
+  ) %>% 
+  add_column(year = "25/26") %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "location" = "Страна_и_город",
+    "role_status" = "Должность_иили_год_обучения",
+    "is_ib_alumni" = "Являетесь_ли_вы_выпускником_Института_биоинформатики",
+    "prior_ib_events" = "На_какой_программе_Института_биоинформатики_вы_учились",
+    "work_description" = "Расскажите_подробнее_о_вашей_работе_какими_исследованиями_занимаетесь_с_какими_проблемами_в_анализе_собственных_данных_сталкиваетесь",
+    "data_analysis_exp" =  "Опишите_ваш_опыт_в_анализе_данных_с_какими_данными_вы_работали_для_каких_целей",
+    "r_programming_exp" = "Опишите_ваш_опыт_программирования_на_R",
+    "expectations" = "Что_вы_ожидаете_от_участия_в_программе",
+    "future_application" = "Как_вы_планируете_применять_полученные_на_программе_знания_в_дальнейшем_",
+    "info_source" = "Откуда_вы_узнали_о_программе",
+    "comments" = "Любая_другая_информация_которой_вы_хотите_поделиться"
+  ) -> gen_info_merged
+```
+
+Проверяем, что получилось.
+
+```{r}
+nrow(gen_info_merged)
+all(gen_info$`Поток 1`$`ID учащегося` %in% gen_info_merged$stud_id)
+all(gen_info$`Поток 2`$`ID учащегося` %in% gen_info_merged$stud_id)
+```
+
+Добавляем колонку с отчислением.
+
+```{r}
+gen_info$Отчисленные %>% 
+  rename("is_expelled" = "Строка в источнике",
+         "stud_id" = "ID учащегося",) %>% 
+  right_join(gen_info_merged) -> gen_info_merged
+```
+
+Глядим.
+
+```{r}
+glimpse(gen_info_merged)
+```
+
+
+## Intro Exam
+
+```{r}
+all(colnames(acad_perf$`Stepik вступительный 1`) == colnames(acad_perf$`Stepik вступительный 2`))
+
+all(acad_perf$`Stepik вступительный 1`$`ID учащегося` %in% acad_perf$`Stepik вступительный 2`$`ID учащегося`)
+
+acad_perf$`Stepik вступительный 1` %>% 
+  add_column(stream_stepik = 1) %>% 
+  bind_rows(
+    acad_perf$`Stepik вступительный 2` %>% 
+      add_column(stream_stepik = 2)
+    ) %>% 
+  filter(!is.na(total)) %>% 
+  rename(
+    stud_id = "ID учащегося",
+    pseudonym = "Псевдоним",
+    intro_math_q1 = "Математика Q1",
+    intro_math_q2 = "Математика Q2",
+    intro_math_q3 = "Математика Q3",
+    intro_math_q4 = "Математика Q4",
+    intro_stat_q1 = "Статистика Q1",
+    intro_stat_q2 = "Статистика Q2",
+    intro_stat_q3 = "Статистика Q3",
+    intro_stat_q4 = "Статистика Q4",
+    intro_rprog_q2 = "Программирование на R Q2",
+    intro_rprog_q3 = "Программирование на R Q3",
+    intro_rprog_q4 = "Программирование на R Q4",
+    intro_total_test = "total"
+  ) -> stepik_intro
+all(stepik_intro$stud_id %in% gen_info_merged$stud_id)
+```
+
+```{r}
+glimpse(stepik_intro)
+```
+
+```{r}
+all(colnames(acad_perf$`Отбор 1`) %in% colnames(acad_perf$`Отбор 2`))
+
+acad_perf$`Отбор 1` %>% 
+    add_column(stream_creative = 1) %>% 
+  bind_rows(
+    acad_perf$`Отбор 2` %>% 
+        add_column(stream_creative = 1)
+    ) %>% 
+  rename(
+    stud_id = "ID учащегося",
+    pseudonym = "Псевдоним",
+    intro_creative_task = "ТЗ"
+  ) %>% 
+  filter(!is.na(intro_creative_task)) -> creative_task
+all(creative_task$stud_id %in% stepik_intro$stud_id)
+nrow(creative_task)
+
+stepik_intro %>% 
+  full_join(creative_task, by = join_by(stud_id, pseudonym)) -> intro_exam
+
+glimpse(intro_exam)
+
+intro_exam %>% 
+  summarise(n = n(),
+            .by = c(stud_id, pseudonym)) %>% 
+  filter(n > 1) -> intro_exam_doubles
+  
+intro_exam_doubles %>% 
+  knitr::kable()
+
+intro_exam %>% 
+  filter(stud_id %in% intro_exam_doubles$stud_id) %>% 
+  arrange(stud_id) -> intro_exam_doubles
+
+intro_exam %>%
+  anti_join(
+    intro_exam_doubles %>% 
+      filter(stream_stepik == 1)
+  ) %>% 
+  arrange(stud_id) -> intro_exam_clean
+
+intro_exam_clean %>% knitr::kable()
+```
+
+
+## Diploma Grades
+
+```{r}
+acad_perf$`Оценки для диплома` %>% colnames()
+acad_perf$`Оценки для диплома` %>% 
+  rename(
+    stud_id = `ID учащегося`,
+    pseudonym = Псевдоним,
+    grade_tv_stats = `1. ТВ и биостатистика`,
+    grade_multivariate = `2. Многофакторный анализ`,
+    grade_evidence_medicine = `3. Методология доказательной медицины`,
+    grade_data_viz = `4. Визуализация данных`,
+    grade_data_management = `5. Управление данными`,
+    grade_sample_size = `6. Методы расчёта выборки`,
+    grade_regulatory = `7. Основы регуляторики`,
+    grade_data_automation = `8. Автоматизация обработки данных`,
+    grade_bioequiv = `9. Анализ биоэквивалентности`,
+    grade_specialtopics = `10. Специальные разделы биостатистики`,
+    grade_biostatpract = `11. Практикум по индустриальной биостатистике`,
+    grade_research_project = `12. Научный проект`
+  ) %>% 
+  rename(
+    grade_tv_stats_a = `Без заголовка [D]`,
+    grade_multivariate_a = `Без заголовка [F]`,
+    grade_evidence_medicine_a = `Без заголовка [H]`,
+    grade_data_viz_a = `Без заголовка [J]`,
+    grade_data_management_a = `Без заголовка [L]`,
+    grade_sample_size_a = `Без заголовка [N]`,
+    grade_research_project_a = `Без заголовка [U]`
+  ) -> grades_diploma
+
+grades_diploma %>% glimpse()
+```
+
+
+## Courses
+
+```{r}
+acad_perf[-(1:5)] %>% names()
+acad_perf[-(1:5)] %>% set_names(
+  c(
+    "tv_stat",
+    "data_automation",
+    "evidence_medicine",
+    "medical_data",
+    "data_viz",
+    "data_management",
+    "multivariate",
+    "sample_size",
+    "survival",
+    "regulatory",
+    "research_project"
+  )
+) -> courses
+```
+
+
+### Deadlines
+
+```{r}
+courses %>% names()
+courses %>% 
+  map(colnames) %>% 
+  map(\(x) tibble(x = x)) %>% 
+  imap(\(x, idx) x %>% mutate(ds = idx)) %>% 
+  bind_rows() %>% 
+  filter(str_detect(x, "ДЛ")) %>% 
+  mutate(x = str_replace(x, "--", "–")) %>% 
+  separate(col = x, into = c("task", "deadline"), sep = "–")
+```
+
+
+### Prob Theory & Stats
+
+```{r}
+courses$tv_stat %>% colnames()
+courses$tv_stat %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "tv_hw1" = "ТВ, ДЗ1, ДЛ – 13 сент",
+    "tv_hw2" = "ТВ, ДЗ2, ДЛ – 5 окт",
+    "stats_hw1" = "МБ, ДЗ1, ДЛ – 20 ноябр",
+    "stats_hw2" = "МБ, ДЗ2, ДЛ – 20 ноябр",
+    "tv_stats_sum" = "SUM",
+    "tv_stats_sum_roundup" = "SUM ROUNDUP",
+    "tv_stats_grade" = "Оценка",
+    "tv_stats_grade_a" = "A/F"
+  ) %>% 
+  select(-`Строка в источнике`) -> tv_stat
+tv_stat %>% knitr::kable()
+```
+
+### Data Automation
+
+```{r}
+courses$data_automation %>% colnames()
+courses$data_automation %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "data_automation_grade" = "ДЛ – 28 сент",
+  ) -> data_automation
+```
+
+### Evidence Medicine
+
+```{r}
+courses$evidence_medicine %>% colnames()
+courses$evidence_medicine %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "evidence_medicine_hw1" = "ДЗ №1, ДЛ – 12 окт",
+    "evidence_medicine_hw2" = "ДЗ №2, ДЛ – 12 окт",
+    "evidence_medicine_hw3" = "ДЛ – 18 ноябр",
+    "evidence_medicine_sum" = "SUM",
+    "evidence_medicine_sum_roundup" = "SUM ROUNDUP",
+    "evidence_medicine_grade" = "Оценка",
+    "evidence_medicine_grade_a" = "A/F"
+  ) -> evidence_medicine
+evidence_medicine %>% knitr::kable()
+```
+
+### Spec Med Data
+
+```{r}
+courses$medical_data %>% colnames()
+courses$medical_data %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "medical_data_grade" = "ДЛ – 18 ноябр"
+  ) %>% 
+  select(-`Строка в источнике`) -> medical_data
+medical_data %>% knitr::kable()
+```
+
+### Data Viz
+
+```{r}
+courses$data_viz %>% colnames()
+courses$data_viz %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "data_viz_hw1" = "ДЗ1 ДЛ -- 05.10",
+    "data_viz_hw2" = "ДЗ2 ДЛ -- 19.10",
+    "data_viz_hw3" = "ДЗ3 ДЛ – 4 дек",
+    "data_viz_sum" = "SUM",
+    "data_viz_roundup" = "SUM ROUNDUP",
+    "data_viz_grade" = "Оценка",
+    "data_viz_grade_a" = "A/F"
+  ) -> data_viz
+data_viz %>% knitr::kable()
+```
+
+### Data Management & Stat Prog
+
+```{r}
+courses$data_management %>% colnames()
+courses$data_management %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "data_management_hw_dm" = "ДЗ ДМ, ДЛ – 3 ноября",
+    "data_management_hw_sp" = "ДЗ СП, ДЛ – 3 ноября",
+    "data_management_sum" = "SUM",
+    "data_management_sum_roundup" = "SUM ROUNDUP",
+    "data_management_grade" = "Оценка",
+    "data_management_grade_a" = "A/F"
+  ) -> data_management
+```
+
+### Multivariate
+
+```{r}
+courses$multivariate %>% colnames()
+courses$multivariate %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "multivariate_hw" = "Финал ДЗ, ДЛ – 28 дек",
+    "multivariate_grade" = "Оценка",
+    "multivariate_grade_a" = "A/F"
+  ) -> multivariate
+multivariate %>% knitr::kable()
+```
+
+### Sample Size Justification
+
+```{r}
+courses$sample_size %>% colnames()
+courses$sample_size %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "sample_size_hw" = "ДЛ – 9 дек",
+    "sample_size_grade" = "Оценка",
+    "sample_size_grade_a" = "A/F"
+  ) -> sample_size
+sample_size %>% knitr::kable()
+```
+
+### Survival Analysis
+
+```{r}
+courses$survival %>% colnames()
+courses$survival %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "survival_hw" = "АВ, ДЛ – 16 дек",
+    "survival_hw_grade" = "Без заголовка [D]"
+  ) -> survival
+survival %>% knitr::kable()
+```
+
+### Regulations
+
+```{r}
+courses$regulatory %>% colnames()
+courses$regulatory %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "regulatory_score" = `Без заголовка [C]`,
+    "regulatory_grade" = `Без заголовка [D]`
+  ) -> regulatory
+regulatory %>% knitr::kable()
+```
+
+### Project
+
+```{r}
+courses$research_project %>% colnames()
+courses$research_project %>% 
+  rename(
+    "stud_id" = "ID учащегося",
+    "pseudonym" = "Псевдоним",
+    "research_project_grade" = "Без заголовка [C]",
+    "research_project_grade_a" = "Без заголовка [D]"
+  ) %>% 
+  select(-`Строка в источнике`) -> research_project
+research_project %>% knitr::kable()
+```
+
+
+```{r}
+#| include: false
+#| eval: false
+
+dir.create("data/25-26", recursive = TRUE)
+# gen_info_merged %>% write_csv("data/25-26/gen_info_merged.csv")
+# intro_exam_clean %>% write_csv("data/25-26/intro_exam_clean.csv")
+# grades_diploma %>% write_csv("data/25-26/grades_diploma.csv")
+# tv_stat %>% write_csv("data/25-26/tv_stat.csv")
+# data_automation %>% write_csv("data/25-26/data_automation.csv")
+# evidence_medicine %>% write_csv("data/25-26/evidence_medicine.csv")
+# medical_data %>% write_csv("data/25-26/medical_data.csv")
+# data_viz %>% write_csv("data/25-26/data_viz.csv")
+# data_management %>% write_csv("data/25-26/data_management.")
+# multivariate %>% write_csv("data/25-26")
+# sample_size %>% write_csv("data/25-26")
+# survival %>% write_csv("data/25-26")
+# regulatory %>% write_csv("data/25-26")
+# research_project %>% write_csv("data/25-26")
+```
+
+## Merge All
+
+```{r}
+gen_info_merged %>%
+  full_join(intro_exam_clean) %>%
+  full_join(grades_diploma) %>%
+  full_join(tv_stat) %>%
+  full_join(data_automation) %>%
+  full_join(evidence_medicine) %>%
+  full_join(medical_data) %>%
+  full_join(data_viz) %>%
+  full_join(data_management) %>%
+  full_join(multivariate) %>%
+  full_join(sample_size) %>%
+  full_join(survival) %>%
+  full_join(regulatory) %>%
+  full_join(research_project) %>% 
+  arrange(stud_id) -> full_data
+full_data %>% nrow()
+all(full_data$stud_id %in% gen_info_merged$stud_id)
+```
+
+```{r}
+#| eval: false
+#| include: false
+
+full_data %>% write_csv("data/25-26/full_data_25-26.csv")
+```
+
+## Check & Fix `full_data`
+
+```{r}
+#| include: false
+
+full_data$grade_tv_stats == full_data$tv_stats_grade
+full_data$grade_tv_stats_a == full_data$tv_stats_grade_a
+full_data$grade_multivariate == full_data$multivariate_grade
+full_data$grade_multivariate_a == full_data$multivariate_grade_a
+full_data$grade_evidence_medicine == full_data$evidence_medicine_grade
+full_data$grade_evidence_medicine_a == full_data$evidence_medicine_grade_a
+full_data$grade_data_viz == full_data$data_viz_grade
+full_data$grade_data_viz_a == full_data$data_viz_grade_a
+full_data$grade_data_management == full_data$data_management_grade
+full_data$grade_data_management_a == full_data$data_management_grade_a
+full_data$grade_sample_size == full_data$sample_size_grade
+full_data$grade_sample_size_a == full_data$sample_size_grade_a
+full_data$grade_regulatory == full_data$regulatory_grade
+full_data$grade_data_automation == full_data$data_automation_grade %>% tolower()
+full_data$grade_bioequiv == full_data$grade_bioequiv
+full_data$grade_research_project == full_data$research_project_grade
+full_data$grade_research_project_a == full_data$research_project_grade_a
+full_data$stream == full_data$stream_stepik
+```
+
+```{r}
+full_data %>% # colnames()
+  mutate(
+    is_expelled = is_expelled %>%
+      str_replace("Да", "1") %>% 
+      replace_na("0") %>% 
+      as.numeric(),
+    is_ib_alumni = is_ib_alumni %>% 
+      str_replace("Да", "1") %>% 
+      str_replace("Нет", "0") %>% 
+      as.numeric(),
+    prior_ib_events = ifelse(is.na(prior_ib_events), 0, 1),
+    info_source_tgchat = info_source %>% str_detect("Телеграм"),
+    info_source_lectorium = info_source %>% str_detect("лектории"),
+    info_source_colleagues = info_source %>% str_detect("коллег"),
+    info_source_selfsearch = info_source %>% str_detect("Самостоятельный"),
+    data_automation_passed = data_automation_grade %>% 
+      tolower() %>% 
+      str_detect("^зачёт") %>% 
+      as.numeric(),
+    survival_hw_passed = survival_hw_grade %>% 
+      tolower() %>% 
+      str_detect("^зачёт") %>% 
+      as.numeric(),
+    regulatory_passed = regulatory_grade %>% 
+      tolower() %>% 
+      str_detect("^зачёт") %>% 
+      as.numeric(),
+  ) %>% 
+  mutate(across(starts_with("info_"), as.numeric)) %>% 
+  mutate(across(contains("hw"), as.numeric)) %>% 
+  # select(
+  #   -Псевдоним,
+  #   -stream_creative,
+  #   -stream_stepik,
+  #   -work_description,
+  #   -data_analysis_exp,
+  #   -r_programming_exp,
+  #   -expectations,
+  #   -future_application,
+  #   -comments,
+  #   -info_source
+  # ) %>% 
+  select(
+    year,
+    stream,
+    # location,
+    # role_status,
+    stud_id,
+    pseudonym,
+    is_expelled,
+    is_ib_alumni, prior_ib_events,
+    starts_with("info_"),
+    starts_with("intro_"),
+    tv_hw1,
+    tv_hw2,
+    stats_hw1,
+    stats_hw2,
+    tv_stats_score = tv_stats_sum_roundup,
+    tv_stats_grade,
+    tv_stats_grade_a,
+    data_automation_passed,
+    evidence_medicine_hw1,
+    evidence_medicine_hw2,
+    evidence_medicine_hw3,
+    evidence_medicine_score = evidence_medicine_sum_roundup,
+    evidence_medicine_grade,
+    evidence_medicine_grade_a,
+    medical_data_score = medical_data_grade,
+    data_viz_hw1,
+    data_viz_hw2,
+    data_viz_hw3,
+    data_viz_score = data_viz_roundup,
+    data_viz_grade,
+    data_viz_grade_a,
+    data_management_hw_dm,
+    data_management_hw_sp,
+    data_management_score = data_management_sum_roundup,
+    data_management_grade,
+    data_management_grade_a,
+    multivariate_hw,
+    multivariate_grade,
+    multivariate_grade_a,
+    sample_size_hw,
+    sample_size_grade,
+    sample_size_grade_a,
+    survival_hw,
+    survival_hw_passed,
+    regulatory_score,
+    regulatory_passed,
+    research_project_grade,
+    research_project_grade_a
+  ) %>% 
+  mutate(across(ends_with("grade"), tolower)) -> full_data_fix
+full_data_fix %>% glimpse()
+```
+
+```{r}
+#| eval: false
+
+full_data_fix %>% write_csv("data/25-26/full_data_fix.csv")
+```
+
