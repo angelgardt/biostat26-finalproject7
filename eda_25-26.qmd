@@ -25,7 +25,7 @@ ds <- read_csv("data/25-26/full_data_fix.csv")
 
 ## Вступительное испытание
 
-Вычисляем корреляции и тестируем значимость с поправкой Вenjamini-Hochberg.
+### Распределения баллов по заданиям
 
 ```{r}
 ds %>% 
@@ -34,7 +34,67 @@ ds %>%
     starts_with("intro_")
   ) %>% 
   rename_all(str_replace, pattern = "intro_", replacement = "") -> introexam
+```
 
+```{r}
+#| label: fig-introtest-task-scores
+#| fig-cap: "Распределение баллов по заданиям тестовой части вступительного испытания"
+
+introexam %>% 
+  select(-creative_task, -total_test) %>% 
+  pivot_longer(cols = -stud_id) %>% 
+  mutate(value = as.character(value)) %>% 
+  ggplot(aes(x = name, fill = value)) +
+  geom_bar() +
+  geom_hline(yintercept = 17, linetype = "dashed") +
+  scale_y_continuous(breaks = seq(0, 34, by = 2)) +
+  labs(x = "Задание", y = "Количество", fill = "Балл")
+```
+
+
+```{r}
+ds %>% 
+  select(
+    stud_id,
+    starts_with("intro_"),
+  ) %>% 
+  select(-intro_total_test, -intro_creative_task) %>% 
+  pivot_longer(cols = -stud_id) %>% 
+  separate(name, into = c("del", "category", "task"), sep = "_") %>% 
+  summarise(
+    score = sum(value),
+    .by = c(category, stud_id)
+  ) %>% 
+  pivot_wider(names_from = category, values_from = score) %>% 
+  left_join(
+    ds %>% 
+      select(stud_id, intro_creative_task)
+  ) -> intro_exam_cat
+```
+
+
+```{r}
+#| label: fig-introtest-cat-scores
+#| fig-cap: "Распределение баллов по категориям заданий тестовой части вступительного испытания"
+
+intro_exam_cat %>% 
+  rename(creative_task = intro_creative_task) %>% 
+  pivot_longer(cols = -stud_id) %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~ name, ncol = 2, scale = "free_x") +
+  scale_y_continuous(breaks = seq(0, 34, by = 2)) +
+  labs(x = "Задание", y = "Количество", fill = "Балл")
+```
+
+
+
+
+### Корреляции баллов между заданиями
+
+Вычисляем корреляции и тестируем значимость с поправкой Вenjamini-Hochberg.
+
+```{r}
 introexam %>% 
   select(-stud_id) %>% 
   corr.test(adjust = "BH") -> introexam_cor_all
@@ -49,7 +109,7 @@ diag(introexam_cor_all_p_bh) <- 0
 
 :::{.panel-tabset}
 
-### Все корреляции
+###### Все корреляции
 
 ```{r}
 #| label: fig-introexam-cor-all
@@ -64,7 +124,7 @@ introexam_cor_all$r %>%
   )
 ```
 
-### Только значимые корреляции
+###### Только значимые корреляции
 
 ```{r}
 #| label: fig-introexam-cor-all-sig
@@ -85,30 +145,14 @@ introexam_cor_all$r %>%
 :::
 
 
+### Корреляции баллов между категориями заданий
+
 Посмотрим корреляции между категориями заданий --- математика, статистика, программирование на R.
 
 Вычисляем корреляции и тестируем значимость с поправкой Вenjamini-Hochberg.
 
 ```{r}
-ds %>% 
-  select(
-    stud_id,
-    starts_with("intro_"),
-  ) %>% 
-  select(-intro_total_test, -intro_creative_task) %>% 
-  pivot_longer(cols = -stud_id) %>% 
-  separate(name, into = c("del", "category", "task"), sep = "_") %>% 
-  summarise(
-    score = sum(value),
-    .by = c(category, stud_id)
-  ) %>% 
-  pivot_wider(names_from = category, values_from = score) -> intro_exam_cat
-
 intro_exam_cat %>% 
-  left_join(
-    ds %>% 
-      select(stud_id, intro_creative_task)
-  ) %>% 
   rename_all(str_replace, pattern = "intro_", replacement = "") %>% 
   select(-stud_id) %>% 
   corr.test(adjust = "BH") -> introexam_cor_cat
@@ -123,7 +167,7 @@ diag(introexam_cor_cat_p_bh) <- 0
 
 :::{.panel-tabset}
 
-### Все корреляции
+###### Все корреляции
 
 ```{r}
 #| label: fig-introexam-cor-cat
@@ -138,7 +182,7 @@ introexam_cor_cat$r %>%
   )
 ```
 
-### Только значимые корреляции
+###### Только значимые корреляции
 
 ```{r}
 #| label: fig-introexam-cor-cat-sig
@@ -184,7 +228,7 @@ diag(intro_diploma_cor_p_bh) <- 0
 
 :::{.panel-tabset}
 
-### Все корреляции
+###### Все корреляции
 
 ```{r}
 #| label: fig-introexam-diploma-cor
@@ -199,7 +243,7 @@ intro_diploma_cor$r %>%
   )
 ```
 
-### Только значимые корреляции
+###### Только значимые корреляции
 
 ```{r}
 #| label: fig-introexam-diploma-cor-sig
@@ -245,7 +289,7 @@ diag(intro_hw_cor_p_bh) <- 0
 
 :::{.panel-tabset}
 
-### Все корреляции
+###### Все корреляции
 
 ```{r}
 #| label: fig-introexam-hw-cor
@@ -261,7 +305,7 @@ intro_hw_cor$r %>%
   )
 ```
 
-### Только значимые корреляции
+###### Только значимые корреляции
 
 ```{r}
 #| label: fig-introexam-hw-cor-sig
@@ -281,5 +325,55 @@ intro_hw_cor$r %>%
 ```
 
 :::
+
+
+## Отчисленные
+
+```{r}
+#| label: fig-expelled-intro
+#| fig-cap: "Сравнение отчисленных с остальными по баллам вступительных"
+
+intro_exam_cat %>% 
+  left_join(
+    ds %>% 
+      select(stud_id, is_expelled)
+  ) %>% 
+  pivot_longer(cols = c(math, stat, rprog, intro_creative_task), 
+               names_to = "task", values_to = "score") %>% 
+  mutate(type = ifelse(task == "intro_creative_task", "creative_task", "test"),
+         is_expelled = as.character(is_expelled)) %>% 
+  ggplot(aes(x = task, y = score, color = is_expelled)) +
+  geom_boxplot(width = .3) +
+  geom_point(position = position_jitter(width = .3, height = .2)) +
+  facet_wrap(~ type, ncol = 2, scale = "free") +
+  scale_color_manual(values = c("0" = "gray", "1" = "red4"))
+```
+
+
+```{r}
+#| label: fig-expelled-diploma
+#| fig-cap: "Сравнение отчисленных с остальными по баллам диплома. pass --- зачетные дисциплины, score --- дисциплины с оценками. −1 --- не сдано"
+
+ds %>% 
+  select(stud_id, is_expelled, starts_with("d_")) %>% 
+  select(-contains("grade")) %>% 
+  rename_all(str_replace, pattern = "^d_", replacement = "") %>% 
+  pivot_longer(cols = -c(stud_id, is_expelled)) %>% 
+  mutate(pass = ifelse(str_detect(name, "passed"), "pass", "score"),
+         name = name %>% 
+           str_replace(pattern = "_score$", replacement = "") %>% 
+           str_replace(pattern = "_passed$", replacement = "") %>% 
+           str_replace(pattern = "_hw$", replacement = "")
+         ) %>% 
+  mutate(is_expelled = as.character(is_expelled),
+         value = replace_na(value, -1)) %>% 
+  ggplot(aes(x = name, y = value, color = is_expelled)) +
+  geom_point(position = position_jitter(width = .3, height = .1)) +
+  facet_wrap(~ pass, scale = "free") +
+  scale_color_manual(values = c("0" = "gray", "1" = "red4")) +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
 
 
